@@ -481,7 +481,7 @@ const SUPABASE_URL = 'https://scvznskikyyucibudcyw.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_H6LV-4ezB1k_khXTAM2z5w_9RQlSpcP';
 // ============================================================
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const USERNAME_KEY = 'agenda:username';
 let username = localStorage.getItem(USERNAME_KEY) || '';
@@ -576,7 +576,7 @@ async function loadTasks(){
   const statusEl = document.getElementById('syncStatus');
   statusEl.textContent = 'Sincronizando...';
   try{
-    const { data, error } = await supabase
+    const { data, error } = await sbClient
       .from('agendas')
       .select('tasks')
       .eq('username', username)
@@ -598,7 +598,7 @@ async function saveTasks(){
   const statusEl = document.getElementById('syncStatus');
   statusEl.textContent = 'Guardando...';
   try{
-    const { error } = await supabase
+    const { error } = await sbClient
       .from('agendas')
       .upsert({ username, tasks, updated_at: new Date().toISOString() });
     if(error) throw error;
