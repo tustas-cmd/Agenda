@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agenda</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#171B23;
+    --surface:#1D222C;
+    --surface-2:#232935;
+    --line:#2B3240;
+    --margin:#8B4A47;
+    --ink:#E9E4D8;
+    --ink-dim:#8F97A3;
+    --amber:#D8A34E;
+    --rose:#C4776B;
+    --sage:#7FA88F;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    min-height:100vh;
+  }
+  .app{
+    display:grid;
+    grid-template-columns:260px 1fr;
+    min-height:100vh;
+  }
+  /* --- Sidebar --- */
+  .sidebar{
+    background:var(--surface);
+    border-right:1px solid var(--line);
+    padding:28px 22px;
+    display:flex;
+    flex-direction:column;
+    gap:26px;
+  }
+  .brand{
+    font-family:'Fraunces',serif;
+    font-weight:700;
+    font-size:26px;
+    letter-spacing:-0.01em;
+  }
+  .brand span{color:var(--amber);}
+  .date-today{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    color:var(--ink-dim);
+    text-transform:capitalize;
+  }
+  .progress-block{
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px 16px;
+  }
+  .progress-label{
+    font-size:11px;
+    color:var(--ink-dim);
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    margin-bottom:8px;
+  }
+  .progress-bar{
+    height:6px;
+    background:var(--line);
+    border-radius:4px;
+    overflow:hidden;
+    margin-bottom:8px;
+  }
+  .progress-fill{
+    height:100%;
+    background:var(--amber);
+    width:0%;
+    transition:width .4s ease;
+  }
+  .progress-count{
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px;
+    color:var(--ink);
+  }
+  form.add-form{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  form.add-form label{
+    font-size:11px;
+    color:var(--ink-dim);
+    text-transform:uppercase;
+    letter-spacing:.08em;
+  }
+  input[type=text], textarea, select{
+    width:100%;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    color:var(--ink);
+    border-radius:7px;
+    padding:9px 10px;
+    font-family:'Inter',sans-serif;
+    font-size:13.5px;
+    outline:none;
+  }
+  input[type=text]:focus, textarea:focus, select:focus{
+    border-color:var(--amber);
+  }
+  textarea{resize:vertical;min-height:50px;}
+  .priority-select{display:flex;gap:6px;}
+  .priority-opt{
+    flex:1;
+    text-align:center;
+    padding:7px 0;
+    border-radius:6px;
+    border:1px solid var(--line);
+    font-size:12px;
+    cursor:pointer;
+    color:var(--ink-dim);
+    user-select:none;
+  }
+  .priority-opt[data-p="alta"].active{background:rgba(216,163,78,.18);border-color:var(--amber);color:var(--amber);}
+  .priority-opt[data-p="media"].active{background:rgba(196,119,107,.18);border-color:var(--rose);color:var(--rose);}
+  .priority-opt[data-p="baja"].active{background:rgba(127,168,143,.18);border-color:var(--sage);color:var(--sage);}
+
+  .recurrence-select{display:flex;gap:6px;}
+  .recurrence-opt{
+    flex:1;
+    text-align:center;
+    padding:7px 0;
+    border-radius:6px;
+    border:1px solid var(--line);
+    font-size:12px;
+    cursor:pointer;
+    color:var(--ink-dim);
+    user-select:none;
+  }
+  .recurrence-opt.active{background:rgba(216,163,78,.12);border-color:var(--amber);color:var(--amber);}
+  .weekday-chips{
+    display:flex;
+    gap:5px;
+    margin-top:8px;
+    flex-wrap:wrap;
+  }
+  .weekday-chip{
+    width:32px;
+    height:28px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:6px;
+    border:1px solid var(--line);
+    font-size:11px;
+    color:var(--ink-dim);
+    cursor:pointer;
+    user-select:none;
+  }
+  .weekday-chip.active{background:rgba(216,163,78,.18);border-color:var(--amber);color:var(--amber);}
+  button.submit{
+    margin-top:4px;
+    background:var(--amber);
+    color:#171B23;
+    border:none;
+    border-radius:7px;
+    padding:10px 0;
+    font-weight:600;
+    font-size:13.5px;
+    cursor:pointer;
+    letter-spacing:.01em;
+  }
+  button.submit:hover{filter:brightness(1.08);}
+
+  /* --- Board --- */
+  .board-wrap{padding:28px 30px;overflow-x:auto;}
+  .board-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:22px;
+  }
+  .board-header h1{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:20px;
+    margin:0;
+    color:var(--ink-dim);
+  }
+  .empty-hint{
+    font-size:12px;
+    color:var(--ink-dim);
+    font-family:'JetBrains Mono',monospace;
+  }
+  .board{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(260px,1fr));
+    gap:20px;
+  }
+  .column{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:16px;
+    min-height:200px;
+  }
+  .column-title{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:14px;
+    font-family:'Fraunces',serif;
+    font-size:15px;
+    font-weight:600;
+  }
+  .column-title .count{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;
+    color:var(--ink-dim);
+    background:var(--surface-2);
+    border-radius:20px;
+    padding:2px 9px;
+  }
+  .col-pendiente .column-title{color:var(--ink);}
+  .col-progreso .column-title{color:var(--rose);}
+  .col-hecha .column-title{color:var(--sage);}
+
+  .card{
+    position:relative;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:12px 12px 12px 16px;
+    margin-bottom:10px;
+    border-left:3px solid var(--margin);
+  }
+  .card[data-priority="alta"]{border-left-color:var(--amber);}
+  .card[data-priority="media"]{border-left-color:var(--rose);}
+  .card[data-priority="baja"]{border-left-color:var(--sage);}
+  .card.done .card-title{text-decoration:line-through;color:var(--ink-dim);}
+  .card-top{
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+  }
+  .card-title{
+    font-size:14px;
+    font-weight:500;
+    line-height:1.35;
+  }
+  .card-notes{
+    font-size:12.5px;
+    color:var(--ink-dim);
+    margin-top:6px;
+    line-height:1.4;
+    white-space:pre-wrap;
+  }
+  .card-meta{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:10px;
+  }
+  .tag{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    padding:2px 7px;
+    border-radius:20px;
+  }
+  .tag.alta{background:rgba(216,163,78,.15);color:var(--amber);}
+  .tag.media{background:rgba(196,119,107,.15);color:var(--rose);}
+  .tag.baja{background:rgba(127,168,143,.15);color:var(--sage);}
+  .tag-recur{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px;
+    color:var(--ink-dim);
+    display:inline-flex;
+    align-items:center;
+    gap:3px;
+  }
+  .card-tags{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .card-actions{display:flex;gap:6px;}
+  .icon-btn{
+    background:none;
+    border:none;
+    color:var(--ink-dim);
+    cursor:pointer;
+    font-size:13px;
+    padding:2px 5px;
+    border-radius:5px;
+  }
+  .icon-btn:hover{color:var(--ink);background:var(--line);}
+  .icon-btn.danger:hover{color:var(--rose);}
+
+  .col-empty{
+    font-size:12px;
+    color:var(--ink-dim);
+    text-align:center;
+    padding:20px 0;
+    border:1px dashed var(--line);
+    border-radius:8px;
+  }
+
+  @media (max-width:820px){
+    .app{grid-template-columns:1fr;}
+    .sidebar{border-right:none;border-bottom:1px solid var(--line);}
+    .board{grid-template-columns:1fr;}
+  }
+
+  /* --- Login / sincronización --- */
+  .session-bar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:8px 12px;
+    font-size:12px;
+    color:var(--ink-dim);
+  }
+  .session-bar b{color:var(--ink);font-weight:600;}
+  .session-bar button{
+    background:none;
+    border:none;
+    color:var(--amber);
+    cursor:pointer;
+    font-size:12px;
+    padding:0;
+  }
+  .sync-status{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px;
+    color:var(--ink-dim);
+  }
+  .modal-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(10,12,16,.75);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+  }
+  .modal-box{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:30px 28px;
+    width:320px;
+    max-width:90vw;
+  }
+  .modal-box h2{
+    font-family:'Fraunces',serif;
+    font-size:22px;
+    margin:0 0 6px;
+  }
+  .modal-box p{
+    font-size:12.5px;
+    color:var(--ink-dim);
+    line-height:1.5;
+    margin:0 0 18px;
+  }
+  .modal-box label{
+    font-size:11px;
+    color:var(--ink-dim);
+    text-transform:uppercase;
+    letter-spacing:.08em;
+  }
+  .modal-box input{margin-top:6px;margin-bottom:16px;}
+  .modal-error{
+    font-size:12px;
+    color:var(--rose);
+    margin:-10px 0 14px;
+    display:none;
+  }
+</style>
+</head>
+<body>
+
+<div class="modal-overlay" id="loginModal">
+  <div class="modal-box">
+    <h2>¿Quién eres?</h2>
+    <p>Escribe tu usuario. Usa el mismo en cualquier dispositivo para ver tus mismas actividades sincronizadas.</p>
+    <label>Usuario</label>
+    <input type="text" id="usernameInput" placeholder="ej. karla_g" autocomplete="off">
+    <div class="modal-error" id="loginError">Escribe un usuario (mínimo 3 caracteres, sin espacios).</div>
+    <button type="button" class="submit" id="loginBtn" style="width:100%;">Entrar</button>
+  </div>
+</div>
+
+<div class="app" id="appRoot" style="display:none;">
+  <aside class="sidebar">
+    <div>
+      <div class="brand">Mi <span>Agenda</span></div>
+      <div class="date-today" id="todayLabel"></div>
+    </div>
+
+    <div class="session-bar">
+      <div>Usuario: <b id="usernameLabel"></b></div>
+      <button type="button" id="switchUserBtn">Cambiar</button>
+    </div>
+    <div class="sync-status" id="syncStatus"></div>
+
+    <div class="progress-block">
+      <div class="progress-label">Progreso de hoy</div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-count" id="progressCount">0 / 0 hechas</div>
+    </div>
+
+    <form class="add-form" id="addForm">
+      <div>
+        <label>Actividad</label>
+        <input type="text" id="titleInput" placeholder="Ej. Llamar al banco" required>
+      </div>
+      <div>
+        <label>Notas (opcional)</label>
+        <textarea id="notesInput" placeholder="Detalles..."></textarea>
+      </div>
+      <div>
+        <label>Prioridad</label>
+        <div class="priority-select" id="prioritySelect">
+          <div class="priority-opt" data-p="alta">Alta</div>
+          <div class="priority-opt active" data-p="media">Media</div>
+          <div class="priority-opt" data-p="baja">Baja</div>
+        </div>
+      </div>
+      <div>
+        <label>Repetir</label>
+        <div class="recurrence-select" id="recurrenceSelect">
+          <div class="recurrence-opt active" data-r="ninguna">Una vez</div>
+          <div class="recurrence-opt" data-r="diaria">Diaria</div>
+          <div class="recurrence-opt" data-r="semanal">Semanal</div>
+        </div>
+        <div class="weekday-chips" id="weekdayChips" style="display:none;">
+          <div class="weekday-chip" data-d="1">L</div>
+          <div class="weekday-chip" data-d="2">M</div>
+          <div class="weekday-chip" data-d="3">X</div>
+          <div class="weekday-chip" data-d="4">J</div>
+          <div class="weekday-chip" data-d="5">V</div>
+          <div class="weekday-chip" data-d="6">S</div>
+          <div class="weekday-chip" data-d="0">D</div>
+        </div>
+      </div>
+      <button type="submit" class="submit">Agregar actividad</button>
+    </form>
+  </aside>
+
+  <main class="board-wrap">
+    <div class="board-header">
+      <h1>Tablero</h1>
+      <span class="empty-hint" id="totalHint"></span>
+    </div>
+    <div class="board">
+      <div class="column col-pendiente">
+        <div class="column-title">Por hacer <span class="count" id="countPendiente">0</span></div>
+        <div id="colPendiente"></div>
+      </div>
+      <div class="column col-progreso">
+        <div class="column-title">En progreso <span class="count" id="countProgreso">0</span></div>
+        <div id="colProgreso"></div>
+      </div>
+      <div class="column col-hecha">
+        <div class="column-title">Hechas <span class="count" id="countHecha">0</span></div>
+        <div id="colHecha"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ============================================================
+// 1) PEGA AQUÍ TU URL Y TU LLAVE "anon public" DE SUPABASE
+// ============================================================
+const SUPABASE_URL = 'https://scvznskikyyucibudcyw.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_H6LV-4ezB1k_khXTAM2z5w_9RQlSpcP';
+// ============================================================
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const USERNAME_KEY = 'agenda:username';
+let username = localStorage.getItem(USERNAME_KEY) || '';
+let tasks = [];
+let selectedPriority = 'media';
+let selectedRecurrence = 'ninguna';
+let selectedWeekDays = [];
+
+const WEEKDAY_LABELS = {0:'Dom',1:'Lun',2:'Mar',3:'Mié',4:'Jue',5:'Vie',6:'Sáb'};
+
+const todayLabel = document.getElementById('todayLabel');
+todayLabel.textContent = new Date().toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long'});
+
+function normalizeUsername(raw){
+  return raw.trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_\-]/g,'');
+}
+
+function showLogin(){
+  document.getElementById('loginModal').style.display = 'flex';
+  document.getElementById('appRoot').style.display = 'none';
+}
+
+function showApp(){
+  document.getElementById('loginModal').style.display = 'none';
+  document.getElementById('appRoot').style.display = 'grid';
+  document.getElementById('usernameLabel').textContent = username;
+}
+
+document.getElementById('loginBtn').addEventListener('click', ()=>{
+  const raw = document.getElementById('usernameInput').value;
+  const clean = normalizeUsername(raw);
+  const err = document.getElementById('loginError');
+  if(clean.length < 3){
+    err.style.display = 'block';
+    return;
+  }
+  err.style.display = 'none';
+  username = clean;
+  localStorage.setItem(USERNAME_KEY, username);
+  showApp();
+  loadTasks();
+});
+
+document.getElementById('usernameInput').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter') document.getElementById('loginBtn').click();
+});
+
+document.getElementById('switchUserBtn').addEventListener('click', ()=>{
+  localStorage.removeItem(USERNAME_KEY);
+  username = '';
+  document.getElementById('usernameInput').value = '';
+  showLogin();
+});
+
+if(username){
+  showApp();
+}else{
+  showLogin();
+}
+
+document.querySelectorAll('.priority-opt').forEach(opt=>{
+  opt.addEventListener('click', ()=>{
+    document.querySelectorAll('.priority-opt').forEach(o=>o.classList.remove('active'));
+    opt.classList.add('active');
+    selectedPriority = opt.dataset.p;
+  });
+});
+
+const weekdayChips = document.getElementById('weekdayChips');
+document.querySelectorAll('.recurrence-opt').forEach(opt=>{
+  opt.addEventListener('click', ()=>{
+    document.querySelectorAll('.recurrence-opt').forEach(o=>o.classList.remove('active'));
+    opt.classList.add('active');
+    selectedRecurrence = opt.dataset.r;
+    weekdayChips.style.display = selectedRecurrence === 'semanal' ? 'flex' : 'none';
+  });
+});
+
+document.querySelectorAll('.weekday-chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    const d = parseInt(chip.dataset.d, 10);
+    chip.classList.toggle('active');
+    if(selectedWeekDays.includes(d)){
+      selectedWeekDays = selectedWeekDays.filter(x=>x!==d);
+    }else{
+      selectedWeekDays.push(d);
+    }
+  });
+});
+
+async function loadTasks(){
+  const statusEl = document.getElementById('syncStatus');
+  statusEl.textContent = 'Sincronizando...';
+  try{
+    const { data, error } = await supabase
+      .from('agendas')
+      .select('tasks')
+      .eq('username', username)
+      .maybeSingle();
+    if(error) throw error;
+    tasks = (data && data.tasks) ? data.tasks : [];
+    statusEl.textContent = 'Sincronizado ✓';
+  }catch(e){
+    console.error(e);
+    statusEl.textContent = 'Sin conexión — revisa tu configuración de Supabase';
+    tasks = [];
+  }
+  const changed = resetRecurringTasks();
+  if(changed) saveTasks();
+  render();
+}
+
+async function saveTasks(){
+  const statusEl = document.getElementById('syncStatus');
+  statusEl.textContent = 'Guardando...';
+  try{
+    const { error } = await supabase
+      .from('agendas')
+      .upsert({ username, tasks, updated_at: new Date().toISOString() });
+    if(error) throw error;
+    statusEl.textContent = 'Sincronizado ✓';
+  }catch(e){
+    console.error(e);
+    statusEl.textContent = 'No se pudo guardar — revisa tu conexión';
+  }
+}
+
+// Reinicia a "pendiente" las tareas recurrentes cuya fecha programada llegó de nuevo.
+function resetRecurringTasks(){
+  let changed = false;
+  const todayDow = new Date().getDay();
+  tasks.forEach(t=>{
+    if(t.status !== 'hecha' || !t.recurrence || t.recurrence === 'ninguna') return;
+    if(isToday(t.updatedAt)) return; // ya se completó hoy, no tocar todavía
+
+    if(t.recurrence === 'diaria'){
+      t.status = 'pendiente';
+      changed = true;
+    }else if(t.recurrence === 'semanal'){
+      const days = (t.weeklyDays && t.weeklyDays.length) ? t.weeklyDays : [new Date(t.createdAt).getDay()];
+      if(days.includes(todayDow)){
+        t.status = 'pendiente';
+        changed = true;
+      }
+    }
+  });
+  return changed;
+}
+
+function isToday(iso){
+  const d = new Date(iso);
+  const t = new Date();
+  return d.toDateString() === t.toDateString();
+}
+
+function render(){
+  const cols = {pendiente:[], progreso:[], hecha:[]};
+  tasks.forEach(t=>cols[t.status].push(t));
+
+  document.getElementById('countPendiente').textContent = cols.pendiente.length;
+  document.getElementById('countProgreso').textContent = cols.progreso.length;
+  document.getElementById('countHecha').textContent = cols.hecha.length;
+  document.getElementById('totalHint').textContent = tasks.length + ' actividad(es) en total';
+
+  renderColumn('colPendiente', cols.pendiente, 'pendiente');
+  renderColumn('colProgreso', cols.progreso, 'progreso');
+  renderColumn('colHecha', cols.hecha, 'hecha');
+
+  const doneToday = tasks.filter(t=>t.status==='hecha' && isToday(t.updatedAt)).length;
+  const totalToday = tasks.filter(t=>isToday(t.createdAt) || (t.status==='hecha' && isToday(t.updatedAt))).length || tasks.length;
+  const pct = tasks.length ? Math.round((tasks.filter(t=>t.status==='hecha').length / tasks.length) * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressCount').textContent =
+    tasks.filter(t=>t.status==='hecha').length + ' / ' + tasks.length + ' hechas';
+}
+
+function renderColumn(elId, list, status){
+  const el = document.getElementById(elId);
+  el.innerHTML = '';
+  if(list.length === 0){
+    el.innerHTML = '<div class="col-empty">Sin actividades</div>';
+    return;
+  }
+  list.sort((a,b)=>{
+    const order = {alta:0, media:1, baja:2};
+    return order[a.priority]-order[b.priority];
+  });
+  list.forEach(t=>{
+    const card = document.createElement('div');
+    card.className = 'card' + (t.status==='hecha' ? ' done' : '');
+    card.dataset.priority = t.priority;
+    card.innerHTML = `
+      <div class="card-top">
+        <div class="card-title">${escapeHtml(t.title)}</div>
+      </div>
+      ${t.notes ? `<div class="card-notes">${escapeHtml(t.notes)}</div>` : ''}
+      <div class="card-meta">
+        <div class="card-tags">
+          <span class="tag ${t.priority}">${t.priority}</span>
+          ${recurrenceLabel(t) ? `<span class="tag-recur">↻ ${recurrenceLabel(t)}</span>` : ''}
+        </div>
+        <div class="card-actions"></div>
+      </div>
+    `;
+    const actions = card.querySelector('.card-actions');
+
+    if(status !== 'pendiente'){
+      const back = document.createElement('button');
+      back.className = 'icon-btn';
+      back.title = 'Regresar';
+      back.textContent = '←';
+      back.onclick = ()=>moveTask(t.id, status==='hecha' ? 'progreso' : 'pendiente');
+      actions.appendChild(back);
+    }
+    if(status !== 'hecha'){
+      const fwd = document.createElement('button');
+      fwd.className = 'icon-btn';
+      fwd.title = 'Avanzar';
+      fwd.textContent = '→';
+      fwd.onclick = ()=>moveTask(t.id, status==='pendiente' ? 'progreso' : 'hecha');
+      actions.appendChild(fwd);
+    }
+    const del = document.createElement('button');
+    del.className = 'icon-btn danger';
+    del.title = 'Eliminar';
+    del.textContent = '✕';
+    del.onclick = ()=>deleteTask(t.id);
+    actions.appendChild(del);
+
+    el.appendChild(card);
+  });
+}
+
+function recurrenceLabel(t){
+  if(!t.recurrence || t.recurrence === 'ninguna') return '';
+  if(t.recurrence === 'diaria') return 'Diaria';
+  const days = (t.weeklyDays && t.weeklyDays.length) ? t.weeklyDays : [new Date(t.createdAt).getDay()];
+  const sorted = [...days].sort((a,b)=> (a===0?7:a) - (b===0?7:b));
+  return sorted.map(d=>WEEKDAY_LABELS[d]).join(', ');
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function moveTask(id, newStatus){
+  const t = tasks.find(x=>x.id===id);
+  if(!t) return;
+  t.status = newStatus;
+  t.updatedAt = new Date().toISOString();
+  saveTasks();
+  render();
+}
+
+function deleteTask(id){
+  tasks = tasks.filter(x=>x.id!==id);
+  saveTasks();
+  render();
+}
+
+document.getElementById('addForm').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const title = document.getElementById('titleInput').value.trim();
+  const notes = document.getElementById('notesInput').value.trim();
+  if(!title) return;
+  const now = new Date().toISOString();
+  tasks.push({
+    id: 'task_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    title, notes,
+    priority: selectedPriority,
+    recurrence: selectedRecurrence,
+    weeklyDays: selectedRecurrence === 'semanal' ? [...selectedWeekDays] : [],
+    status: 'pendiente',
+    createdAt: now,
+    updatedAt: now
+  });
+  document.getElementById('titleInput').value = '';
+  document.getElementById('notesInput').value = '';
+  document.querySelectorAll('.recurrence-opt').forEach(o=>o.classList.remove('active'));
+  document.querySelector('.recurrence-opt[data-r="ninguna"]').classList.add('active');
+  document.querySelectorAll('.weekday-chip').forEach(c=>c.classList.remove('active'));
+  selectedRecurrence = 'ninguna';
+  selectedWeekDays = [];
+  weekdayChips.style.display = 'none';
+  saveTasks();
+  render();
+});
+</script>
+</body>
+</html>
